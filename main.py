@@ -69,7 +69,7 @@ def send(body):
     msg["From"] = EMAIL
     msg["To"] = EMAIL
 
-    with smtplib.SMTP_SSL("smtp.yandex.com", 465) as s:
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
         s.login(EMAIL, PASS)
         s.send_message(msg)
 
