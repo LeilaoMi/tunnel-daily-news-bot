@@ -1,69 +1,57 @@
 import requests
+import re
 import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime
 import os
-import re
 
 EMAIL = os.getenv("EMAIL")
 PASS = os.getenv("PASS")
 
-# 🔥 多源（关键：扩大范围）
 SOURCES = [
-    "https://raw.githubusercontent.com/freefq/free/master/v2",
-    "https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/v2ray.txt",
-    "https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub",
-    "https://www.freeclashnode.com/",
+    "https://api.github.com/search/code?q=vmess",
+    "https://api.github.com/search/code?q=vless",
+    "https://api.github.com/search/code?q=trojan",
 ]
 
-# 🔥 节点特征（弱过滤）
-PATTERNS = [
-    r"vmess://[A-Za-z0-9+/=]+",
-    r"vless://[^\s]+",
-    r"trojan://[^\s]+",
-    r"ss://[^\s]+",
-    r"ssr://[^\s]+",
-    r"https?://[^\s]*clash[^\s]*",
-]
+PATTERN = r"(vmess://[^\s]+|vless://[^\s]+|trojan://[^\s]+|ss://[^\s]+)"
 
 def fetch():
     text = ""
 
+    headers = {"Accept": "application/vnd.github+json"}
+
     for url in SOURCES:
         try:
-            r = requests.get(url, timeout=10)
-            text += r.text + "\n"
+            r = requests.get(url, headers=headers, timeout=10)
+            data = r.json()
+
+            for item in data.get("items", []):
+                if "text_matches" in item:
+                    for m in item["text_matches"]:
+                        text += m.get("fragment", "") + "\n"
+
         except:
             pass
 
     return text
 
-def extract_nodes(text):
-    nodes = []
+def extract(text):
+    return list(set(re.findall(PATTERN, text)))[:100]
 
-    for pattern in PATTERNS:
-        matches = re.findall(pattern, text)
-        nodes.extend(matches)
-
-    # 去重
-    return list(set(nodes))[:100]
-
-def format_msg(nodes):
+def send(nodes):
     date = datetime.now().strftime("%Y-%m-%d")
 
-    msg = f"【节点收集 {date}】\n\n"
+    body = f"【节点收集 {date}】\n\n"
 
     if not nodes:
-        msg += "未抓到节点（源失效或被限制）"
+        body += "未获取到节点（GitHub限流或无匹配结果）"
     else:
         for i, n in enumerate(nodes, 1):
-            msg += f"{i}. {n}\n\n"
+            body += f"{i}. {n}\n\n"
 
-    return msg
-
-def send(body):
     msg = MIMEText(body, "plain", "utf-8")
-    msg["Subject"] = "每日节点收集"
+    msg["Subject"] = "节点收集"
     msg["From"] = EMAIL
     msg["To"] = EMAIL
 
@@ -73,5 +61,5 @@ def send(body):
 
 if __name__ == "__main__":
     raw = fetch()
-    nodes = extract_nodes(raw)
-    send(format_msg(nodes))
+    nodes = extract(raw)
+    send(nodes)
