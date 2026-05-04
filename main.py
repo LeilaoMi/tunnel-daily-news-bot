@@ -3,43 +3,67 @@ import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime
 import os
+import re
 
 EMAIL = os.getenv("EMAIL")
 PASS = os.getenv("PASS")
 
-KEYWORDS = [
-    "xray", "v2ray", "clash", "sing-box",
-    "config", "yaml", "protocol"
+# 🔥 多源（关键：扩大范围）
+SOURCES = [
+    "https://raw.githubusercontent.com/freefq/free/master/v2",
+    "https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/v2ray.txt",
+    "https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub",
+    "https://www.freeclashnode.com/",
+]
+
+# 🔥 节点特征（弱过滤）
+PATTERNS = [
+    r"vmess://[A-Za-z0-9+/=]+",
+    r"vless://[^\s]+",
+    r"trojan://[^\s]+",
+    r"ss://[^\s]+",
+    r"ssr://[^\s]+",
+    r"https?://[^\s]*clash[^\s]*",
 ]
 
 def fetch():
-    url = "https://api.github.com/search/repositories?q=v2ray+clash+sing-box"
-    try:
-        r = requests.get(url, timeout=10)
-        data = r.json()
+    text = ""
 
-        text = ""
-        for item in data.get("items", []):
-            text += item.get("full_name", "") + "\n"
-            text += item.get("description", "") + "\n"
+    for url in SOURCES:
+        try:
+            r = requests.get(url, timeout=10)
+            text += r.text + "\n"
+        except:
+            pass
 
-        return text
-    except:
-        return ""
+    return text
 
-# 👇 你写的逻辑（保留并优化）
-def analyze_repo(text):
-    signals = []
+def extract_nodes(text):
+    nodes = []
 
-    for line in text.split("\n"):
-        if any(k in line.lower() for k in KEYWORDS):
-            signals.append(line.strip())
+    for pattern in PATTERNS:
+        matches = re.findall(pattern, text)
+        nodes.extend(matches)
 
-    return list(set(signals))[:50]
+    # 去重
+    return list(set(nodes))[:100]
 
-def send_email(body):
+def format_msg(nodes):
+    date = datetime.now().strftime("%Y-%m-%d")
+
+    msg = f"【节点收集 {date}】\n\n"
+
+    if not nodes:
+        msg += "未抓到节点（源失效或被限制）"
+    else:
+        for i, n in enumerate(nodes, 1):
+            msg += f"{i}. {n}\n\n"
+
+    return msg
+
+def send(body):
     msg = MIMEText(body, "plain", "utf-8")
-    msg["Subject"] = f"网络技术情报 {datetime.now().strftime('%Y-%m-%d')}"
+    msg["Subject"] = "每日节点收集"
     msg["From"] = EMAIL
     msg["To"] = EMAIL
 
@@ -49,11 +73,5 @@ def send_email(body):
 
 if __name__ == "__main__":
     raw = fetch()
-    result = analyze_repo(raw)
-
-    if not result:
-        body = "今日未检测到相关技术更新"
-    else:
-        body = "【技术情报】\n\n" + "\n".join(result)
-
-    send_email(body)
+    nodes = extract_nodes(raw)
+    send(format_msg(nodes))
