@@ -8,36 +8,31 @@ import os
 EMAIL = os.getenv("EMAIL")
 PASS = os.getenv("PASS")
 
+# 🔥 多真实可访问来源（重点）
 SOURCES = [
-    "https://api.github.com/search/code?q=vmess",
-    "https://api.github.com/search/code?q=vless",
-    "https://api.github.com/search/code?q=trojan",
+    "https://www.freeclashnode.com/",
+    "https://nodefree.org/",
+    "https://clashnode.com/",
+    "https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/v2ray.txt",
 ]
 
-PATTERN = r"(vmess://[^\s]+|vless://[^\s]+|trojan://[^\s]+|ss://[^\s]+)"
+PATTERN = r"(vmess://[^\s\"']+|vless://[^\s\"']+|trojan://[^\s\"']+|ss://[^\s\"']+)"
 
 def fetch():
     text = ""
 
-    headers = {"Accept": "application/vnd.github+json"}
-
     for url in SOURCES:
         try:
-            r = requests.get(url, headers=headers, timeout=10)
-            data = r.json()
-
-            for item in data.get("items", []):
-                if "text_matches" in item:
-                    for m in item["text_matches"]:
-                        text += m.get("fragment", "") + "\n"
-
+            r = requests.get(url, timeout=10)
+            text += r.text + "\n"
         except:
             pass
 
     return text
 
 def extract(text):
-    return list(set(re.findall(PATTERN, text)))[:100]
+    nodes = re.findall(PATTERN, text)
+    return list(set(nodes))[:150]
 
 def send(nodes):
     date = datetime.now().strftime("%Y-%m-%d")
@@ -45,13 +40,13 @@ def send(nodes):
     body = f"【节点收集 {date}】\n\n"
 
     if not nodes:
-        body += "未获取到节点（GitHub限流或无匹配结果）"
+        body += "未抓到节点（源可能被墙或更新）"
     else:
         for i, n in enumerate(nodes, 1):
             body += f"{i}. {n}\n\n"
 
     msg = MIMEText(body, "plain", "utf-8")
-    msg["Subject"] = "节点收集"
+    msg["Subject"] = "节点收集日报"
     msg["From"] = EMAIL
     msg["To"] = EMAIL
 
