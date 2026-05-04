@@ -1,0 +1,45 @@
+import requests
+import smtplib
+from email.mime.text import MIMEText
+from datetime import datetime
+
+# ========= 配置 =========
+YANDEX_EMAIL = "你的邮箱@yandex.com"
+YANDEX_PASS = "你的SMTP密码"
+TO_EMAIL = "你的邮箱@yandex.com"
+
+# RSS源（可自己加）
+RSS_LIST = [
+    "https://rsshub.app/telegram/channel/s/durov",
+    "https://rsshub.app/github/trending",
+    "https://hnrss.org/frontpage",
+]
+
+def fetch_rss():
+    content = ""
+    for url in RSS_LIST:
+        try:
+            r = requests.get(url, timeout=10)
+            content += r.text[:2000]  # 防止过长
+        except:
+            pass
+    return content
+
+def summarize(text):
+    # 简单版（不调用AI，稳定）
+    return text[:1000]
+
+def send_email(body):
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = f"每日情报 {datetime.now().strftime('%Y-%m-%d')}"
+    msg["From"] = YANDEX_EMAIL
+    msg["To"] = TO_EMAIL
+
+    with smtplib.SMTP_SSL("smtp.yandex.com", 465) as server:
+        server.login(YANDEX_EMAIL, YANDEX_PASS)
+        server.send_message(msg)
+
+if __name__ == "__main__":
+    data = fetch_rss()
+    summary = summarize(data)
+    send_email(summary)
